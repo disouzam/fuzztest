@@ -73,6 +73,32 @@ BinaryInfo ReadBinaryInfo(std::string_view binary_name,
   return ret;
 }
 
+AnalyzeSingleCorporaResults AnalyzeSingleCorpora(std::string_view binary_name,
+                                                 std::string_view binary_hash,
+                                                 std::string_view workdir) {
+  BinaryInfo binary_info = ReadBinaryInfo(binary_name, binary_hash, workdir);
+  const std::vector<CorpusRecord> corpus_record =
+      ReadCorpora(binary_name, binary_hash, workdir);
+
+  absl::flat_hash_set<size_t> pcs;
+  for (const auto &record : corpus_record) {
+    for (const auto &feature : record.features) {
+      if (!feature_domains::kPCs.Contains(feature)) continue;
+      auto pc = ConvertPCFeatureToPcIndex(feature);
+      pcs.insert(pc);
+    }
+  }
+  LOG(INFO) << VV(corpus_record.size());
+
+  AnalyzeSingleCorporaResults ret;
+  // Sort PCs to put them in the canonical order, as in pc_table.
+  ret.pcs = std::vector<size_t>{pcs.begin(), pcs.end()};
+  std::sort(ret.pcs.begin(), ret.pcs.end());
+
+  ret.binary_info = std::move(binary_info);
+  return ret;
+}
+
 AnalyzeCorporaResults AnalyzeCorpora(const BinaryInfo &binary_info,
                                      const std::vector<CorpusRecord> &a,
                                      const std::vector<CorpusRecord> &b) {
