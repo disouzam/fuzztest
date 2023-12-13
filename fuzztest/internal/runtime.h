@@ -323,7 +323,10 @@ class FuzzTestFuzzerImpl : public FuzzTestFuzzer {
   // Defined in centipede_adaptor.cc
   friend class CentipedeFuzzerAdaptor;
   friend class CentipedeAdaptorRunnerCallbacks;
+  friend class CentipedeAdaptorEngineCallbacks;
 };
+
+size_t GetStackLimitFromEnvOrConfiguration(const Configuration& configuration);
 
 }  // namespace internal
 }  // namespace fuzztest

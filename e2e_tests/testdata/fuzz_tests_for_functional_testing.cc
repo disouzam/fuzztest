@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -748,5 +749,20 @@ void CrashOnCrashingInput(const std::string& input) {
   if (absl::StartsWith(input, "crashing")) std::abort();
 }
 FUZZ_TEST(MySuite, CrashOnCrashingInput);
+
+void Sleep(unsigned int x) { sleep(x); }
+FUZZ_TEST(MySuite, Sleep).WithDomains(Just(10));
+
+void LargeHeapAllocation(size_t allocation_size) {
+  static volatile void* ptr_sink = nullptr;
+  void* ptr = malloc(allocation_size);
+  memset(ptr, 42, allocation_size);
+  ptr_sink = ptr;
+  free(ptr);
+}
+FUZZ_TEST(MySuite, LargeHeapAllocation)
+    .WithDomains(Just(
+        // 1 GiB
+        1ULL << 30));
 
 }  // namespace

@@ -140,6 +140,11 @@ void ThreadLocalRunnerState::OnThreadStart() {
   termination_detector.EnsureAlive();
   tls.lowest_sp = tls.top_frame_sp =
       reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  tls.stack_region_low = GetCurrentThreadStackRegionLow();
+  if (tls.stack_region_low == 0) {
+    fprintf(stderr,
+            "Disabling stack limit check due to missing stack region info.\n");
+  }
   tls.call_stack.Reset(state.run_time_flags.callstack_level);
   tls.path_ring_buffer.Reset(state.run_time_flags.path_level);
   LockGuard lock(state.tls_list_mu);
@@ -260,6 +265,21 @@ static void CheckWatchdogLimits() {
   }
 }
 
+__attribute__((noinline)) void CheckStackLimit(uintptr_t sp) {
+  // Check for the stack limit only if sp is inside the stack region.
+  if (size_t stack_limit = state.run_time_flags.stack_limit_kb.load() << 10;
+      stack_limit > 0 && tls.stack_region_low &&
+      tls.top_frame_sp - sp > stack_limit) {
+    fprintf(stderr,
+            "========= Stack limit exceeded: %" PRIuPTR " > %" PRIu64
+            " (byte); aborting\n",
+            tls.top_frame_sp - sp, stack_limit);
+    centipede::WriteFailureDescription(
+        centipede::kExecutionFailureStackLimitExceeded.data());
+    abort();
+  }
+}
+
 void GlobalRunnerState::CleanUpDetachedTls() {
   LockGuard lock(tls_list_mu);
   ThreadLocalRunnerState *it_next = nullptr;
@@ -275,7 +295,7 @@ void GlobalRunnerState::StartWatchdogThread() {
           "Starting watchdog thread: timeout_per_input: %" PRIu64
           " sec; timeout_per_batch: %" PRIu64 " sec; rss_limit_mb: %" PRIu64
           " MB\n",
-          state.run_time_flags.timeout_per_input,
+          state.run_time_flags.timeout_per_input.load(),
           state.run_time_flags.timeout_per_batch,
           state.run_time_flags.rss_limit_mb.load());
   pthread_t watchdog_thread;
@@ -1054,9 +1074,23 @@ extern "C" __attribute__((used)) void CentipedeIsPresent() {}
 extern "C" __attribute__((used)) void __libfuzzer_is_present() {}
 
 extern "C" void CentipedeSetRssLimit(size_t rss_limit_mb) {
-  fprintf(stderr, "CentipedeSetRssLimit: changing rss_limit_mb to %zu",
+  fprintf(stderr, "CentipedeSetRssLimit: changing rss_limit_mb to %zu\n",
           rss_limit_mb);
   centipede::state.run_time_flags.rss_limit_mb = rss_limit_mb;
+}
+
+extern "C" void CentipedeSetStackLimit(size_t stack_limit_kb) {
+  fprintf(stderr, "CentipedeSetStackLimit: changing stack_limit_kb to %zu\n",
+          stack_limit_kb);
+  centipede::state.run_time_flags.stack_limit_kb = stack_limit_kb;
+}
+
+extern "C" void CentipedeSetTimeoutPerInput(uint64_t timeout_per_input) {
+  fprintf(stderr,
+          "CentipedeSetTimeoutPerInput: changing timeout_per_input to %" PRIu64
+          "\n",
+          timeout_per_input);
+  centipede::state.run_time_flags.timeout_per_input = timeout_per_input;
 }
 
 extern "C" __attribute__((weak)) const char *CentipedeGetRunnerFlags() {
@@ -1092,9 +1126,11 @@ extern "C" void CentipedeEndExecutionBatch() {
 
 extern "C" void CentipedePrepareProcessing() {
   centipede::PrepareCoverage(/*full_clear=*/!in_execution_batch);
+  centipede::state.ResetTimers();
 }
 
 extern "C" void CentipedeFinalizeProcessing() {
+  centipede::CheckWatchdogLimits();
   centipede::PostProcessCoverage(/*target_return_value=*/0);
 }
 

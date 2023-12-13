@@ -23,6 +23,8 @@
 
 namespace fuzztest::internal {
 
+class CentipedeFixtureDriver;
+
 // Adaptor for running FuzzTest fuzzers with the Centipede engine.
 class CentipedeFuzzerAdaptor : public FuzzTestFuzzer {
  public:
@@ -35,7 +37,7 @@ class CentipedeFuzzerAdaptor : public FuzzTestFuzzer {
  private:
   const FuzzTest& test_;
   FuzzTestFuzzerImpl fuzzer_impl_;
-
+  CentipedeFixtureDriver* centipede_fixture_driver_;
   Runtime& runtime_ = Runtime::instance();
 };
 
