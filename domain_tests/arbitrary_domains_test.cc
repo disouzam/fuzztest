@@ -100,6 +100,21 @@ TEST(ArbitraryByteTest, InitGeneratesSeeds) {
               Contains(Value(domain, std::byte{42})).Times(Ge(350)));
 }
 
+TEST(ArbitraryByteTest, GetRandomValueYieldsEveryValue) {
+  Domain<std::byte> domain = Arbitrary<std::byte>();
+
+  absl::flat_hash_set<std::byte> values;
+  absl::BitGen prng;
+  // For 5000 attempts, the probability that some value won't be generated is
+  // less than 10^(-6).
+  for (int i = 0; i < 5000; ++i) {
+    std::byte val = domain.GetRandomValue(prng);
+    values.insert(val);
+  }
+
+  EXPECT_THAT(values, SizeIs(256));
+}
+
 struct MyStruct {
   int a;
   std::string s;

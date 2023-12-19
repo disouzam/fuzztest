@@ -99,6 +99,7 @@ class UntypedDomainInterface {
 template <typename ValueType>
 class TypedDomainInterface : public UntypedDomainInterface {
  public:
+  virtual ValueType TypedGetRandomValue(absl::BitGenRef prng) = 0;
   virtual ValueType TypedGetValue(const GenericDomainCorpusType& v) const = 0;
   virtual std::optional<GenericDomainCorpusType> TypedFromValue(
       const ValueType& v) const = 0;
@@ -146,6 +147,10 @@ class DomainBase : public TypedDomainInterface<ValueType> {
 
   void UntypedUpdateMemoryDictionary(const GenericDomainCorpusType& val) final {
     derived().UpdateMemoryDictionary(val.GetAs<CorpusType>());
+  }
+
+  ValueType TypedGetRandomValue(absl::BitGenRef prng) final {
+    return derived().GetRandomValue(prng);
   }
 
   ValueType TypedGetValue(const GenericDomainCorpusType& v) const final {
@@ -201,6 +206,22 @@ class DomainBase : public TypedDomainInterface<ValueType> {
         "No tuple element should be specified for this override.");
     internal::PrintValue(derived(), val.GetAs<CorpusType>(), out, mode);
     return -1;
+  }
+
+  // Default implementation of GetRandomValue() without guarantees on the
+  // distribution of the returned values. If possible, the derived domain should
+  // override this with a better implementation.
+  ValueType GetRandomValue(absl::BitGenRef prng) {
+    constexpr int kMaxMutations = 1000;
+    auto corpus_val = derived().Init(prng);
+    // Mutate a random number of times (including zero times). This eliminates
+    // potential cyclicity issues (e.g., even number of mutations cancel out)
+    // and allows returning an initial value with small but positive
+    // probability.
+    for (int i = absl::Uniform(prng, 0, kMaxMutations); i > 0; --i) {
+      derived().Mutate(corpus_val, prng, /*only_shrink=*/false);
+    }
+    return derived().GetValue(corpus_val);
   }
 
   // Default GetValue and FromValue functions for !has_custom_corpus_type

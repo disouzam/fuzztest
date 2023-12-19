@@ -156,6 +156,8 @@ class InRangeImpl : public DomainBase<InRangeImpl<T>> {
     } while (val == prev);  // Make sure Mutate really mutates.
   }
 
+  value_type GetRandomValue(absl::BitGenRef prng) { return Init(prng); }
+
   absl::Status ValidateCorpusValue(const value_type& corpus_value) const {
     if (min_ <= corpus_value && corpus_value <= max_) return absl::OkStatus();
     // We cannot just absl::StrCat() the error message, because it doesn't

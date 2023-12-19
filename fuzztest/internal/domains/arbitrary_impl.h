@@ -75,6 +75,8 @@ class ArbitraryImpl<T, std::enable_if_t<is_monostate_v<T>>>
 
   void Mutate(value_type&, absl::BitGenRef, bool) {}
 
+  value_type GetRandomValue(absl::BitGenRef prng) { return value_type{}; }
+
   absl::Status ValidateCorpusValue(const value_type&) const {
     return absl::OkStatus();  // Nothing to validate.
   }
@@ -98,6 +100,8 @@ class ArbitraryImpl<bool> : public DomainBase<ArbitraryImpl<bool>> {
       val = !val;
     }
   }
+
+  value_type GetRandomValue(absl::BitGenRef prng) { return Init(prng); }
 
   absl::Status ValidateCorpusValue(const value_type&) const {
     return absl::OkStatus();  // Nothing to validate.
@@ -165,6 +169,8 @@ class ArbitraryImpl<T, std::enable_if_t<!std::is_const_v<T> &&
     } while (val == prev);
   }
 
+  value_type GetRandomValue(absl::BitGenRef prng) { return Init(prng); }
+
   void UpdateMemoryDictionary(const value_type& val) {
     if constexpr (is_memory_dictionary_compatible_v) {
       if (GetExecutionCoverage() != nullptr) {
@@ -218,6 +224,8 @@ class ArbitraryImpl<std::byte> : public DomainBase<ArbitraryImpl<std::byte>> {
     inner_.Mutate(u8, prng, only_shrink);
     val = std::byte{u8};
   }
+
+  value_type GetRandomValue(absl::BitGenRef prng) { return Init(prng); }
 
   absl::Status ValidateCorpusValue(const corpus_type&) const {
     return absl::OkStatus();  // Nothing to validate.

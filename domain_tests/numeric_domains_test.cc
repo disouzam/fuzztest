@@ -257,6 +257,28 @@ TYPED_TEST(NumericTest, NonZero) {
   for (auto v : values) ASSERT_THAT(v.user_value, Ne(0));
 }
 
+template <typename T>
+class CharTest : public testing::Test {};
+using CharTypes = testing::Types<char, signed char, unsigned char>;
+
+TYPED_TEST_SUITE(CharTest, CharTypes);
+
+TYPED_TEST(CharTest, GetRandomValueYieldsEveryValue) {
+  using T = TypeParam;
+  Domain<T> domain = Arbitrary<T>();
+
+  absl::flat_hash_set<T> values;
+  absl::BitGen prng;
+  // For 5000 attempts, the probability that some value won't be generated is
+  // less than 10^(-6).
+  for (int i = 0; i < 5000; ++i) {
+    T val = domain.GetRandomValue(prng);
+    values.insert(val);
+  }
+
+  EXPECT_THAT(values, SizeIs(256));
+}
+
 TEST(Finite, CreatesFiniteFloatingPointValuesAndShrinksTowardsZero) {
   Domain<double> domain = Finite<double>();
   const auto values = GenerateValues(domain,
@@ -321,6 +343,21 @@ TEST(InRange, SupportsSingletonRange) {
   val.Mutate(domain, bitgen, /*only_shrink=*/false);
 
   EXPECT_EQ(val.user_value, 10);
+}
+
+TEST(InRange, GetRandomValueYieldsEveryValue) {
+  auto domain = InRange(1, 64);
+
+  absl::flat_hash_set<int> values;
+  absl::BitGen prng;
+  // For 3500 attempts, the probability that some value won't be generated is
+  // less than 10^(-6).
+  for (int i = 0; i < 3500; ++i) {
+    auto val = domain.GetRandomValue(prng);
+    values.insert(val);
+  }
+
+  EXPECT_THAT(values, SizeIs(64));
 }
 
 TEST(IllegalInputs, Numeric) {

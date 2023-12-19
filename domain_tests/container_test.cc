@@ -175,6 +175,26 @@ TYPED_TEST(ContainerTest, InitGeneratesSeeds) {
   EXPECT_THAT(GenerateInitialValues(domain, 1000), Contains(seed));
 }
 
+TEST(StringTest, GetRandomValueYieldsSeedsAndOtherValues) {
+  Domain<std::string> domain = Arbitrary<std::string>().WithSeeds({"seed"});
+
+  absl::BitGen prng;
+  bool seed_seen = false;
+  bool other_seen = false;
+  // For 28000 attempts, the probability that we won't see the seed is less
+  // than 10^(-6).
+  for (int i = 0; !(seed_seen && other_seen) && i < 28000; ++i) {
+    auto val = domain.GetRandomValue(prng);
+    if (val == "seed") {
+      seed_seen = true;
+    } else {
+      other_seen = true;
+    }
+  }
+
+  EXPECT_TRUE(seed_seen && other_seen);
+}
+
 TEST(Container, ValidationRejectsInvalidSize) {
   absl::BitGen bitgen;
 
