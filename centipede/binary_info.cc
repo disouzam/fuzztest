@@ -111,8 +111,8 @@ void BinaryInfo::InitializeFromSanCovBinary(
     CHECK_EQ(num_instrumened_pcs_in_all_dsos, pc_table.size());
   }
 
-  // Load symbols, if there is a PC table.
-  if (!pc_table.empty()) {
+  // Load symbols, if there is a PC or DSO table.
+  if (!pc_table.empty() || !dso_table.empty()) {
     ScopedFile sym_tmp1_path(tmp_dir_path, "symbols_tmp1");
     ScopedFile sym_tmp2_path(tmp_dir_path, "symbols_tmp2");
     symbols.GetSymbolsFromBinary(pc_table, dso_table, symbolizer_path,
