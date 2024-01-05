@@ -73,11 +73,14 @@ class CmpTrace {
   // Iterates non-zero CMP pairs.
   template <typename Callback>
   void ForEachNonZero(Callback callback) {
-    for (const auto &item : items_) {
+    for (auto &item : items_) {
       if (IsZero(item.value0, item.size.get()) &&
           IsZero(item.value1, item.size.get()))
         continue;
       callback(item.size.get(), item.value0, item.value1);
+      item.size.set(0);
+      __builtin_memset(item.value0, 0, item.size.get());
+      __builtin_memset(item.value1, 0, item.size.get());
     }
   }
 
