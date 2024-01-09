@@ -18,9 +18,11 @@
 #include <filesystem>  // NOLINT
 #include <fstream>
 #include <istream>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -149,17 +151,18 @@ void SymbolTable::GetSymbolsFromBinary(const PCTable &pc_table,
 }
 
 void SymbolTable::SetAllToUnknown(size_t size) {
-  entries_.resize(size);
-  for (auto &entry : entries_) {
-    entry = {"?", "?"};
+  entries_.clear();
+  lookup_.clear();
+  db_.clear();
+  for (size_t i = 0; i < size; i++) {
+    AddEntryInternal("?", "?");
   }
 }
 
 void SymbolTable::AddEntry(std::string_view func,
                            std::string_view file_line_col) {
   if (absl::StrContains(file_line_col, "?")) {
-    entries_.emplace_back(
-        Entry{std::string(func), std::string(file_line_col), 0, 0});
+    AddEntryInternal(func, file_line_col, 0, 0);
     return;
   }
   const std::vector<std::string_view> file_line_col_split =
@@ -180,8 +183,25 @@ void SymbolTable::AddEntry(std::string_view func,
         << "Unable to convert column number string to an int: "
         << file_line_col_split[2];
   }
-  entries_.emplace_back(
-      Entry{std::string(func), std::string(file_line_col_split[0]), line, col});
+  AddEntryInternal(func, file_line_col_split[0], line, col);
+}
+
+void SymbolTable::AddEntryInternal(std::string_view func, std::string_view file,
+                                   int line, int col) {
+  entries_.emplace_back(Entry{GetOrInsert(func), GetOrInsert(file), line, col});
+}
+
+std::string_view SymbolTable::GetOrInsert(std::string_view str) {
+  auto it = lookup_.find(str);
+  if (it != lookup_.end()) {
+    return *it;
+  }
+
+  auto str_ptr = std::make_unique<std::string>(str);
+  std::string_view res(*str_ptr);
+  db_.emplace_back(std::move(str_ptr));
+  lookup_.insert(res);
+  return res;
 }
 
 }  // namespace centipede

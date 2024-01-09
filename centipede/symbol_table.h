@@ -16,10 +16,13 @@
 #define THIRD_PARTY_CENTIPEDE_SYMBOL_TABLE_H_
 
 #include <cstddef>
+#include <cstdlib>
 #include <istream>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -39,18 +42,22 @@ namespace centipede {
 // function names, file names, line numbers, column numbers.
 class SymbolTable {
  public:
+  SymbolTable() = default;
+  SymbolTable(const SymbolTable &) = delete;
+  SymbolTable(SymbolTable &&) = default;
+  SymbolTable &operator=(SymbolTable &&) = default;
   // Defines a symbol table entry.
   struct Entry {
-    std::string func;
-    std::string file;
+    std::string_view func;
+    std::string_view file;
     int line = -1;
     int col = -1;
     bool operator==(const Entry &other) const = default;
     std::string file_line_col() const {
       if (absl::StrContains(file, "?")) {
-        return file;
+        return std::string(file);
       }
-      std::string ret = file;
+      std::string ret = std::string(file);
       if (line >= 0) {
         absl::StrAppend(&ret, ":", line);
       }
@@ -98,24 +105,31 @@ class SymbolTable {
   size_t size() const { return entries_.size(); }
 
   // Returns "FunctionName" for idx-th entry.
-  const std::string &func(size_t idx) const { return entries_[idx].func; }
+  std::string_view func(size_t idx) const { return at(idx).func; }
 
-  Entry entry(size_t idx) const { return entries_[idx]; }
+  const Entry &at(size_t idx) const { return entries_[idx]; }
 
   // Returns source code location for idx-th entry,
-  std::string location(size_t idx) const {
-    return entries_[idx].file_line_col();
-  }
+  std::string location(size_t idx) const { return at(idx).file_line_col(); }
 
   // Returns a full human-readable description for idx-th entry.
   std::string full_description(size_t idx) const {
-    return func(idx) + " " + location(idx);
+    return std::string(func(idx)) + " " + location(idx);
   }
 
   // Add function name and file location to symbol table.
   void AddEntry(std::string_view func, std::string_view file_line_col);
 
  private:
+  void AddEntryInternal(std::string_view func, std::string_view file,
+                        int line = -1, int col = -1);
+
+  std::string_view GetOrInsert(std::string_view str);
+
+  // Declaration order matters here, because we want db_ to be deleted last in
+  // order to avoid having dangling ptrs in lookup_ and entries_.
+  std::vector<std::unique_ptr<std::string>> db_;
+  std::unordered_set<std::string_view> lookup_;
   std::vector<Entry> entries_;
 };
 
